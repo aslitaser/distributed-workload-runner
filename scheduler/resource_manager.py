@@ -20,9 +20,19 @@ class ResourceManager:
             return False
         
         # Check GPU requirements
-        if job.gpu_type:
-            if not executor.gpu_types or job.gpu_type not in executor.gpu_types:
+        if job.gpu_type and job.gpu_count > 0:
+            # Check if executor has enough available GPUs
+            if job.gpu_count > executor.available_gpus:
                 return False
+            
+            # Check GPU type compatibility
+            if job.gpu_type != "any":
+                if not executor.gpu_types or job.gpu_type not in executor.gpu_types:
+                    return False
+            else:
+                # For "any" GPU type, just need to have some GPU types available
+                if not executor.gpu_types:
+                    return False
         
         # Check region requirements
         if job.eligible_regions:
@@ -49,6 +59,7 @@ class ResourceManager:
             # Calculate new available resources
             new_cpu = executor.available_cpu_cores - job.cpu_cores
             new_memory = executor.available_memory_gb - job.memory_gb
+            new_gpus = executor.available_gpus - job.gpu_count
             
             # Update executor resources
             pipe = self.redis_client.redis_client.pipeline()
@@ -56,6 +67,7 @@ class ResourceManager:
             
             pipe.hset(executor_key, "available_cpu_cores", new_cpu)
             pipe.hset(executor_key, "available_memory_gb", new_memory)
+            pipe.hset(executor_key, "available_gpus", new_gpus)
             pipe.hset(executor_key, "last_heartbeat", datetime.utcnow().isoformat())
             pipe.expire(executor_key, 120)
             
@@ -82,6 +94,10 @@ class ResourceManager:
                 executor.available_memory_gb + job.memory_gb,
                 executor.total_memory_gb
             )
+            new_gpus = min(
+                executor.available_gpus + job.gpu_count,
+                executor.total_gpus
+            )
             
             # Update executor resources
             pipe = self.redis_client.redis_client.pipeline()
@@ -89,6 +105,7 @@ class ResourceManager:
             
             pipe.hset(executor_key, "available_cpu_cores", new_cpu)
             pipe.hset(executor_key, "available_memory_gb", new_memory)
+            pipe.hset(executor_key, "available_gpus", new_gpus)
             pipe.hset(executor_key, "last_heartbeat", datetime.utcnow().isoformat())
             pipe.expire(executor_key, 120)
             
@@ -129,7 +146,7 @@ class ResourceManager:
         
         # Sort executors by available resources (prefer executors with more available resources)
         available_executors.sort(
-            key=lambda x: (x.available_cpu_cores, x.available_memory_gb),
+            key=lambda x: (x.available_cpu_cores, x.available_memory_gb, x.available_gpus),
             reverse=True
         )
         

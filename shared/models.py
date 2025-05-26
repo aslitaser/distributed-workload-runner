@@ -19,6 +19,7 @@ class Job(BaseModel):
     cpu_cores: int = Field(ge=1)
     memory_gb: int = Field(ge=1)
     gpu_type: Optional[str] = None
+    gpu_count: int = Field(default=0, ge=0)
     status: JobStatus = JobStatus.PENDING
     status_date: datetime = Field(default_factory=datetime.utcnow)
     executor_ip: Optional[str] = None
@@ -49,6 +50,8 @@ class ExecutorResources(BaseModel):
     total_memory_gb: int
     available_memory_gb: int
     gpu_types: List[str] = Field(default_factory=list)
+    total_gpus: int = Field(default=0, ge=0)
+    available_gpus: int = Field(default=0, ge=0)
     region: str
     datacenter: str
     last_heartbeat: datetime = Field(default_factory=datetime.utcnow)

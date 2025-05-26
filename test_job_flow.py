@@ -44,8 +44,13 @@ def test_job_execution_flow():
                 for executor in executors:
                     region = executor.get('region', 'unknown')
                     datacenter = executor.get('datacenter', 'unknown')
+                    gpu_info = ""
+                    if executor.get('gpu_types') and executor.get('total_gpus', 0) > 0:
+                        gpu_types = ", ".join(executor['gpu_types'])
+                        gpu_count = f"{executor.get('available_gpus', 0)}/{executor.get('total_gpus', 0)}"
+                        gpu_info = f", GPUs: {gpu_count} ({gpu_types})"
                     print(f"   - {executor['ip']}: {executor['available_cpu_cores']} CPU, "
-                          f"{executor['available_memory_gb']}GB RAM, "
+                          f"{executor['available_memory_gb']}GB RAM{gpu_info}, "
                           f"Region: {region}, DC: {datacenter}")
             else:
                 print("⚠️  No executors available")
@@ -295,6 +300,149 @@ def test_region_datacenter_scheduling():
         return False
 
 
+def test_gpu_scheduling():
+    """Test GPU-aware job scheduling."""
+    print("\n🎮 Testing GPU-aware scheduling...")
+    
+    scheduler_api = "http://localhost:8000"
+    
+    print("\n1️⃣ Checking GPU availability...")
+    try:
+        response = requests.get(f"{scheduler_api}/executors", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            executors = data.get("executors", [])
+            
+            gpu_executors = [e for e in executors if e.get('gpu_types') and e.get('available_gpus', 0) > 0]
+            
+            if not gpu_executors:
+                print("⚠️  No GPU executors available - skipping GPU tests")
+                print("💡 To test GPU scheduling, start executors with GPU configuration")
+                return False
+                
+            print(f"✅ Found {len(gpu_executors)} GPU executor(s):")
+            for executor in gpu_executors:
+                gpu_info = f"{executor.get('available_gpus', 0)}/{executor.get('total_gpus', 0)} GPUs"
+                gpu_types = ", ".join(executor.get('gpu_types', []))
+                print(f"   - {executor['ip']}: {gpu_info} ({gpu_types})")
+            
+            # Test 1: Job requiring "any" GPU
+            print("\n2️⃣ Testing job with 'any' GPU requirement...")
+            any_gpu_job = {
+                "docker_image": "alpine:latest",
+                "command": ["echo", "Running with any GPU"],
+                "cpu_cores": 1,
+                "memory_gb": 1,
+                "gpu_type": "any",
+                "gpu_count": 1
+            }
+            
+            response = requests.post(f"{scheduler_api}/jobs", json=any_gpu_job, timeout=10)
+            if response.status_code == 201:
+                job_data = response.json()
+                job_id = job_data["job_id"]
+                print(f"✅ 'Any' GPU job submitted: {job_id}")
+                
+                # Wait and check assignment
+                time.sleep(5)
+                response = requests.get(f"{scheduler_api}/jobs/{job_id}", timeout=5)
+                if response.status_code == 200:
+                    job_info = response.json()
+                    if job_info.get("executor_ip"):
+                        print(f"✅ Job assigned to GPU executor: {job_info['executor_ip']}")
+                    else:
+                        print("⏳ Job not yet assigned")
+            else:
+                print(f"❌ 'Any' GPU job submission failed: {response.text}")
+            
+            # Test 2: Job requiring specific GPU type
+            if gpu_executors[0].get('gpu_types'):
+                print("\n3️⃣ Testing job with specific GPU type...")
+                specific_gpu_type = gpu_executors[0]['gpu_types'][0]
+                specific_gpu_job = {
+                    "docker_image": "alpine:latest",
+                    "command": ["echo", f"Running with {specific_gpu_type}"],
+                    "cpu_cores": 1,
+                    "memory_gb": 1,
+                    "gpu_type": specific_gpu_type,
+                    "gpu_count": 1
+                }
+                
+                response = requests.post(f"{scheduler_api}/jobs", json=specific_gpu_job, timeout=10)
+                if response.status_code == 201:
+                    job_data = response.json()
+                    print(f"✅ Specific GPU job submitted: {job_data['job_id']}")
+                    print(f"   Required GPU: {specific_gpu_type}")
+                else:
+                    print(f"❌ Specific GPU job submission failed: {response.text}")
+            
+            # Test 3: Job requiring more GPUs than available
+            print("\n4️⃣ Testing job with excessive GPU requirements...")
+            max_available_gpus = max(e.get('available_gpus', 0) for e in gpu_executors)
+            excessive_gpu_job = {
+                "docker_image": "alpine:latest",
+                "command": ["echo", "This should not run"],
+                "cpu_cores": 1,
+                "memory_gb": 1,
+                "gpu_type": "any",
+                "gpu_count": max_available_gpus + 10,  # More than available
+                "allocation_timeout": 30
+            }
+            
+            response = requests.post(f"{scheduler_api}/jobs", json=excessive_gpu_job, timeout=10)
+            if response.status_code == 201:
+                job_data = response.json()
+                job_id = job_data["job_id"]
+                print(f"✅ Excessive GPU job submitted: {job_id}")
+                print(f"   Required GPUs: {max_available_gpus + 10} (should fail)")
+                
+                # Wait for allocation timeout
+                print("   Waiting for allocation timeout...")
+                time.sleep(35)
+                
+                response = requests.get(f"{scheduler_api}/jobs/{job_id}", timeout=5)
+                if response.status_code == 200:
+                    job_info = response.json()
+                    if job_info['status'] == 'failed':
+                        print("✅ Job correctly failed due to insufficient GPUs")
+                    else:
+                        print(f"❌ Job status is {job_info['status']}, expected 'failed'")
+            
+            # Test 4: Job requiring unsupported GPU type
+            print("\n5️⃣ Testing job with unsupported GPU type...")
+            unsupported_gpu_job = {
+                "docker_image": "alpine:latest",
+                "command": ["echo", "This should not run"],
+                "cpu_cores": 1,
+                "memory_gb": 1,
+                "gpu_type": "unsupported-gpu-type",
+                "gpu_count": 1,
+                "allocation_timeout": 30
+            }
+            
+            response = requests.post(f"{scheduler_api}/jobs", json=unsupported_gpu_job, timeout=10)
+            if response.status_code == 201:
+                job_data = response.json()
+                job_id = job_data["job_id"]
+                print(f"✅ Unsupported GPU job submitted: {job_id}")
+                print("   This should fail due to unsupported GPU type...")
+                
+                time.sleep(35)
+                response = requests.get(f"{scheduler_api}/jobs/{job_id}", timeout=5)
+                if response.status_code == 200:
+                    job_info = response.json()
+                    if job_info['status'] == 'failed':
+                        print("✅ Job correctly failed due to unsupported GPU type")
+                    else:
+                        print(f"❌ Job status is {job_info['status']}, expected 'failed'")
+            
+            return True
+        
+    except Exception as e:
+        print(f"❌ Error in GPU scheduling test: {e}")
+        return False
+
+
 def test_resource_scheduling():
     """Test resource-aware job scheduling."""
     print("\n🔬 Testing resource-aware scheduling...")
@@ -349,6 +497,9 @@ if __name__ == "__main__":
     if success:
         # Test resource scheduling
         test_resource_scheduling()
+        
+        # Test GPU scheduling
+        test_gpu_scheduling()
         
         # Test region/datacenter aware scheduling
         test_region_datacenter_scheduling()
