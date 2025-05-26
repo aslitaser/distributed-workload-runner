@@ -24,6 +24,16 @@ class ResourceManager:
             if not executor.gpu_types or job.gpu_type not in executor.gpu_types:
                 return False
         
+        # Check region requirements
+        if job.eligible_regions:
+            if executor.region not in job.eligible_regions:
+                return False
+        
+        # Check datacenter requirements
+        if job.eligible_datacenters:
+            if executor.datacenter not in job.eligible_datacenters:
+                return False
+        
         return True
 
     def allocate_resources(self, job: Job, executor_ip: str) -> bool:

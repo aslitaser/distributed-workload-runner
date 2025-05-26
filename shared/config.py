@@ -46,4 +46,6 @@ class ExecutorConfig:
     EXECUTOR_IP = os.getenv("EXECUTOR_IP", "localhost")
     HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", "30"))
     JOB_POLL_INTERVAL = int(os.getenv("JOB_POLL_INTERVAL", "5"))
+    REGION_NAME = os.getenv("EXECUTOR_REGION", "us-east-1")
+    DATACENTER_NAME = os.getenv("EXECUTOR_DATACENTER", "dc1")
     REDIS_CONFIG = RedisConfig

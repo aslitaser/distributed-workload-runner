@@ -105,6 +105,8 @@ class ExecutorRedisClient:
                 "total_memory_gb": resources.total_memory_gb,
                 "available_memory_gb": resources.available_memory_gb,
                 "gpu_types": ",".join(resources.gpu_types),  # Convert list to comma-separated string
+                "region": resources.region,
+                "datacenter": resources.datacenter,
                 "last_heartbeat": resources.last_heartbeat.isoformat()
             }
             

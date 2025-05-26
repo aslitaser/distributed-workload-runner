@@ -5,12 +5,15 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 from shared.models import ExecutorResources
+from shared.config import ExecutorConfig
 
 
 class ResourceMonitor:
     def __init__(self):
         self.hostname = socket.gethostname()
         self.ip_address = self._get_ip_address()
+        self.region = ExecutorConfig.REGION_NAME
+        self.datacenter = ExecutorConfig.DATACENTER_NAME
         
     def _get_ip_address(self) -> str:
         """Get the IP address of this machine."""
@@ -137,6 +140,8 @@ class ResourceMonitor:
                 total_memory_gb=memory_info["total_memory_gb"],
                 available_memory_gb=memory_info["available_memory_gb"],
                 gpu_types=gpu_info,
+                region=self.region,
+                datacenter=self.datacenter,
                 last_heartbeat=datetime.utcnow()
             )
         except Exception as e:
@@ -149,6 +154,8 @@ class ResourceMonitor:
                 total_memory_gb=1,
                 available_memory_gb=1,
                 gpu_types=[],
+                region=self.region,
+                datacenter=self.datacenter,
                 last_heartbeat=datetime.utcnow()
             )
 
@@ -171,6 +178,8 @@ class ResourceMonitor:
             return {
                 "hostname": self.hostname,
                 "ip_address": self.ip_address,
+                "region": self.region,
+                "datacenter": self.datacenter,
                 "timestamp": datetime.utcnow().isoformat(),
                 "uptime_hours": (datetime.utcnow() - boot_time).total_seconds() / 3600,
                 "process_count": process_count,

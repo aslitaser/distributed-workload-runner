@@ -1,5 +1,5 @@
 from typing import List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from shared.models import Job, JobStatus
 from scheduler.redis_client import SchedulerRedisClient
@@ -34,6 +34,14 @@ class JobManager:
                 return scheduled_jobs
             
             for job in pending_jobs:
+                # Check if job has exceeded allocation timeout
+                time_since_creation = (datetime.utcnow() - job.created_at).total_seconds()
+                if time_since_creation > job.allocation_timeout:
+                    print(f"Job {job.job_id} exceeded allocation timeout ({job.allocation_timeout}s)")
+                    # Mark job as failed due to allocation timeout
+                    self.redis_client.update_job_status(str(job.job_id), JobStatus.FAILED)
+                    continue
+                
                 # Find suitable executor using first-fit algorithm
                 suitable_executor = self.resource_manager.find_suitable_executor(job)
                 
@@ -46,8 +54,12 @@ class JobManager:
                     else:
                         print(f"Failed to assign job {job.job_id} to executor {suitable_executor.ip}")
                 else:
+                    # Log why no suitable executor was found
+                    regions_msg = f", regions: {job.eligible_regions}" if job.eligible_regions else ""
+                    datacenters_msg = f", datacenters: {job.eligible_datacenters}" if job.eligible_datacenters else ""
                     print(f"No suitable executor found for job {job.job_id} "
-                          f"(CPU: {job.cpu_cores}, Memory: {job.memory_gb}GB, GPU: {job.gpu_type})")
+                          f"(CPU: {job.cpu_cores}, Memory: {job.memory_gb}GB, GPU: {job.gpu_type}"
+                          f"{regions_msg}{datacenters_msg})")
         
         except Exception as e:
             print(f"Error during job scheduling: {e}")

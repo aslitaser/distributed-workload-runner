@@ -21,6 +21,9 @@ class JobCreateRequest(BaseModel):
     cpu_cores: int = Field(..., ge=1, description="Number of CPU cores required")
     memory_gb: int = Field(..., ge=1, description="Memory in GB required")
     gpu_type: Optional[str] = Field(None, description="GPU type required (optional)")
+    allocation_timeout: Optional[int] = Field(None, ge=30, description="Allocation timeout in seconds (default: 300)")
+    eligible_regions: Optional[List[str]] = Field(None, description="List of eligible regions for execution")
+    eligible_datacenters: Optional[List[str]] = Field(None, description="List of eligible datacenters for execution")
 
 
 class JobResponse(BaseModel):
@@ -30,6 +33,9 @@ class JobResponse(BaseModel):
     cpu_cores: int
     memory_gb: int
     gpu_type: Optional[str]
+    allocation_timeout: int
+    eligible_regions: List[str]
+    eligible_datacenters: List[str]
     status: JobStatus
     status_date: str
     executor_ip: Optional[str]
@@ -132,6 +138,9 @@ def job_to_response(job: Job) -> JobResponse:
         cpu_cores=job.cpu_cores,
         memory_gb=job.memory_gb,
         gpu_type=job.gpu_type,
+        allocation_timeout=job.allocation_timeout,
+        eligible_regions=job.eligible_regions,
+        eligible_datacenters=job.eligible_datacenters,
         status=job.status,
         status_date=job.status_date.isoformat(),
         executor_ip=job.executor_ip,
@@ -151,7 +160,10 @@ async def create_job(
             command=job_request.command,
             cpu_cores=job_request.cpu_cores,
             memory_gb=job_request.memory_gb,
-            gpu_type=job_request.gpu_type
+            gpu_type=job_request.gpu_type,
+            allocation_timeout=job_request.allocation_timeout if job_request.allocation_timeout else 300,
+            eligible_regions=job_request.eligible_regions if job_request.eligible_regions else [],
+            eligible_datacenters=job_request.eligible_datacenters if job_request.eligible_datacenters else []
         )
         
         success = job_manager.submit_job(job)

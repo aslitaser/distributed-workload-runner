@@ -57,7 +57,8 @@ class ExecutorService:
             # Get initial resource information
             resources = self.resource_monitor.get_current_resources()
             logger.info(f"Detected resources: {resources.total_cpu_cores} CPU cores, "
-                  f"{resources.total_memory_gb}GB memory, GPUs: {resources.gpu_types}")
+                  f"{resources.total_memory_gb}GB memory, GPUs: {resources.gpu_types}, "
+                  f"Region: {resources.region}, Datacenter: {resources.datacenter}")
             
             # Register with scheduler
             success = self.redis_client.register_resources(resources)
