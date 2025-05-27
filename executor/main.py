@@ -56,8 +56,9 @@ class ExecutorService:
             
             # Get initial resource information
             resources = self.resource_monitor.get_current_resources()
+            gpu_info = f"{resources.total_gpus} GPUs ({', '.join(resources.gpu_types)})" if resources.gpu_types else "No GPUs"
             logger.info(f"Detected resources: {resources.total_cpu_cores} CPU cores, "
-                  f"{resources.total_memory_gb}GB memory, GPUs: {resources.gpu_types}, "
+                  f"{resources.total_memory_gb}GB memory, {gpu_info}, "
                   f"Region: {resources.region}, Datacenter: {resources.datacenter}")
             
             # Register with scheduler
@@ -115,15 +116,19 @@ class ExecutorService:
                     job = job_info["job"]
                     resources.available_cpu_cores -= job.cpu_cores
                     resources.available_memory_gb -= job.memory_gb
+                    if hasattr(job, 'gpu_count') and job.gpu_count > 0:
+                        resources.available_gpus -= job.gpu_count
             
             # Ensure available resources don't go negative
             resources.available_cpu_cores = max(0, resources.available_cpu_cores)
             resources.available_memory_gb = max(0, resources.available_memory_gb)
+            resources.available_gpus = max(0, resources.available_gpus)
             
             success = self.redis_client.register_resources(resources)
             if success:
+                gpu_info = f", {resources.available_gpus} GPU" if resources.total_gpus > 0 else ""
                 print(f"Heartbeat sent - Available: {resources.available_cpu_cores} CPU, "
-                      f"{resources.available_memory_gb}GB memory")
+                      f"{resources.available_memory_gb}GB memory{gpu_info}")
             else:
                 print("Failed to send heartbeat")
                 
@@ -160,12 +165,14 @@ class ExecutorService:
                 self.redis_client.add_job_log(job_id, log_line)
             
             # Start job in Docker with enhanced configuration
+            gpu_count = getattr(job, 'gpu_count', 1 if job.gpu_type else 0)
             container_id = self.docker_manager.start_container(
                 image=job.docker_image,
                 command=job.command,
                 cpu_cores=job.cpu_cores,
                 memory_gb=job.memory_gb,
                 gpu_type=job.gpu_type,
+                gpu_count=gpu_count,
                 environment={
                     "JOB_ID": job_id,
                     "EXECUTOR_IP": self.executor_ip

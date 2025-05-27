@@ -37,6 +37,7 @@ class DockerManager:
         cpu_cores: int = 1, 
         memory_gb: int = 1,
         gpu_type: Optional[str] = None,
+        gpu_count: int = 0,
         environment: Optional[Dict[str, str]] = None,
         volumes: Optional[Dict[str, Dict[str, str]]] = None,
         working_dir: Optional[str] = None,
@@ -52,7 +53,7 @@ class DockerManager:
             
             # Prepare container configuration
             container_config = self._build_container_config(
-                image, command, cpu_cores, memory_gb, gpu_type, 
+                image, command, cpu_cores, memory_gb, gpu_type, gpu_count,
                 environment, volumes, working_dir
             )
             
@@ -68,6 +69,7 @@ class DockerManager:
                 "cpu_cores": cpu_cores,
                 "memory_gb": memory_gb,
                 "gpu_type": gpu_type,
+                "gpu_count": gpu_count,
                 "status": "running"
             }
             
@@ -76,8 +78,9 @@ class DockerManager:
                 self.log_callbacks[container_id] = log_callback
                 self._start_log_streaming(container_id)
             
+            gpu_info = f"{gpu_count}x {gpu_type}" if gpu_type and gpu_count > 0 else "none"
             print(f"Started container {container_id[:12]} for image {image} "
-                  f"(CPU: {cpu_cores}, Memory: {memory_gb}GB, GPU: {gpu_type or 'none'})")
+                  f"(CPU: {cpu_cores}, Memory: {memory_gb}GB, GPU: {gpu_info})")
             return container_id
             
         except docker.errors.ContainerError as e:
@@ -113,6 +116,7 @@ class DockerManager:
         cpu_cores: int, 
         memory_gb: int, 
         gpu_type: Optional[str] = None,
+        gpu_count: int = 0,
         environment: Optional[Dict[str, str]] = None,
         volumes: Optional[Dict[str, Dict[str, str]]] = None,
         working_dir: Optional[str] = None
@@ -138,10 +142,10 @@ class DockerManager:
         config["memswap_limit"] = f"{memory_gb}g"  # Prevent swap usage
         
         # GPU support
-        if gpu_type:
-            # For nvidia-docker runtime
+        if gpu_type and gpu_count > 0:
+            # For nvidia-docker runtime - allocate specific number of GPUs
             config["device_requests"] = [
-                docker.types.DeviceRequest(count=-1, capabilities=[["gpu"]])
+                docker.types.DeviceRequest(count=gpu_count, capabilities=[["gpu"]])
             ]
             # Alternative: use runtime if nvidia-docker2 is installed
             # config["runtime"] = "nvidia"

@@ -130,6 +130,8 @@ class SchedulerRedisClient:
                     "total_memory_gb": int(data["total_memory_gb"]),
                     "available_memory_gb": int(data["available_memory_gb"]),
                     "gpu_types": data["gpu_types"].split(",") if data["gpu_types"] else [],
+                    "total_gpus": int(data.get("total_gpus", 0)),
+                    "available_gpus": int(data.get("available_gpus", 0)),
                     "region": data.get("region", "unknown"),
                     "datacenter": data.get("datacenter", "unknown"),
                     "last_heartbeat": datetime.fromisoformat(data["last_heartbeat"])
@@ -158,6 +160,8 @@ class SchedulerRedisClient:
                             "total_memory_gb": int(data["total_memory_gb"]),
                             "available_memory_gb": int(data["available_memory_gb"]),
                             "gpu_types": data["gpu_types"].split(",") if data["gpu_types"] else [],
+                            "total_gpus": int(data.get("total_gpus", 0)),
+                            "available_gpus": int(data.get("available_gpus", 0)),
                             "region": data.get("region", "unknown"),
                             "datacenter": data.get("datacenter", "unknown"),
                             "last_heartbeat": datetime.fromisoformat(data["last_heartbeat"])

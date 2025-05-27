@@ -105,6 +105,8 @@ class ExecutorRedisClient:
                 "total_memory_gb": resources.total_memory_gb,
                 "available_memory_gb": resources.available_memory_gb,
                 "gpu_types": ",".join(resources.gpu_types),  # Convert list to comma-separated string
+                "total_gpus": resources.total_gpus,
+                "available_gpus": resources.available_gpus,
                 "region": resources.region,
                 "datacenter": resources.datacenter,
                 "last_heartbeat": resources.last_heartbeat.isoformat()
@@ -117,13 +119,15 @@ class ExecutorRedisClient:
             print(f"Error registering resources: {e}")
             return False
 
-    def update_available_resources(self, available_cpu: int, available_memory: int) -> bool:
+    def update_available_resources(self, available_cpu: int, available_memory: int, available_gpus: Optional[int] = None) -> bool:
         try:
             executor_key = RedisKeys.executor_resources(self.executor_ip)
             
             pipe = self.redis_client.pipeline()
             pipe.hset(executor_key, "available_cpu_cores", available_cpu)
             pipe.hset(executor_key, "available_memory_gb", available_memory)
+            if available_gpus is not None:
+                pipe.hset(executor_key, "available_gpus", available_gpus)
             pipe.hset(executor_key, "last_heartbeat", datetime.utcnow().isoformat())
             pipe.expire(executor_key, 120)
             pipe.execute()

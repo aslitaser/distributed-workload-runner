@@ -132,6 +132,7 @@ class ResourceMonitor:
             cpu_info = self.get_cpu_info()
             memory_info = self.get_memory_info()
             gpu_info = self.get_gpu_info()
+            total_gpus = len(gpu_info)
             
             return ExecutorResources(
                 ip=self.ip_address,
@@ -140,6 +141,8 @@ class ResourceMonitor:
                 total_memory_gb=memory_info["total_memory_gb"],
                 available_memory_gb=memory_info["available_memory_gb"],
                 gpu_types=gpu_info,
+                total_gpus=total_gpus,
+                available_gpus=total_gpus,  # Initially all GPUs are available
                 region=self.region,
                 datacenter=self.datacenter,
                 last_heartbeat=datetime.utcnow()
@@ -154,6 +157,8 @@ class ResourceMonitor:
                 total_memory_gb=1,
                 available_memory_gb=1,
                 gpu_types=[],
+                total_gpus=0,
+                available_gpus=0,
                 region=self.region,
                 datacenter=self.datacenter,
                 last_heartbeat=datetime.utcnow()
