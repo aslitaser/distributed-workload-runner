@@ -66,6 +66,7 @@ class SchedulerRedisClient:
                 if executor_ip:
                     pipe.sadd(RedisKeys.executor_jobs(executor_ip), job_id)
             elif status in [JobStatus.SUCCEEDED, JobStatus.FAILED]:
+                pipe.zrem(RedisKeys.jobs_pending(), job_id)
                 pipe.srem(RedisKeys.jobs_running(), job_id)
                 if job.executor_ip:
                     pipe.srem(RedisKeys.executor_jobs(job.executor_ip), job_id)
