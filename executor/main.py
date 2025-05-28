@@ -4,8 +4,9 @@ import sys
 import time
 import threading
 import logging
+import os
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from shared.models import Job, JobStatus
 from shared.config import ExecutorConfig
@@ -164,6 +165,9 @@ class ExecutorService:
             def log_callback(log_line: str):
                 self.redis_client.add_job_log(job_id, log_line)
             
+            # Parse volumes from job definition
+            volumes = self._parse_volumes(job.volumes) if job.volumes else None
+            
             # Start job in Docker with enhanced configuration
             gpu_count = getattr(job, 'gpu_count', 1 if job.gpu_type else 0)
             container_id = self.docker_manager.start_container(
@@ -177,6 +181,7 @@ class ExecutorService:
                     "JOB_ID": job_id,
                     "EXECUTOR_IP": self.executor_ip
                 },
+                volumes=volumes,
                 log_callback=log_callback
             )
             
@@ -387,6 +392,42 @@ class ExecutorService:
             self.shutdown()
         
         return 0
+
+
+    def _parse_volumes(self, volume_specs: List[str]) -> Dict[str, Dict[str, str]]:
+        """Parse volume specifications from job format to Docker format.
+        
+        Job format: 'host_path:container_path[:mode]'
+        Docker format: {host_path: {'bind': container_path, 'mode': mode}}
+        """
+        volumes = {}
+        
+        for spec in volume_specs:
+            parts = spec.split(':')
+            
+            if len(parts) < 2:
+                print(f"Invalid volume specification: {spec}")
+                continue
+                
+            host_path = parts[0]
+            container_path = parts[1]
+            mode = parts[2] if len(parts) > 2 else 'rw'
+            
+            # Validate mode
+            if mode not in ['rw', 'ro']:
+                print(f"Invalid volume mode '{mode}' for {spec}, defaulting to 'rw'")
+                mode = 'rw'
+            
+            # Check if host path exists
+            if not os.path.exists(host_path):
+                print(f"Warning: Host path '{host_path}' does not exist")
+            
+            volumes[host_path] = {
+                'bind': container_path,
+                'mode': mode
+            }
+            
+        return volumes
 
 
 def main():

@@ -26,6 +26,7 @@ class Job(BaseModel):
     allocation_timeout: int = Field(default=300, ge=30, description="Timeout in seconds for job allocation")
     eligible_regions: List[str] = Field(default_factory=list, description="List of eligible regions for execution")
     eligible_datacenters: List[str] = Field(default_factory=list, description="List of eligible datacenters for execution")
+    volumes: List[str] = Field(default_factory=list, description="List of volumes to mount (format: 'host_path:container_path[:mode]')")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

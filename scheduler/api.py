@@ -25,6 +25,7 @@ class JobCreateRequest(BaseModel):
     allocation_timeout: Optional[int] = Field(None, ge=30, description="Allocation timeout in seconds (default: 300)")
     eligible_regions: Optional[List[str]] = Field(None, description="List of eligible regions for execution")
     eligible_datacenters: Optional[List[str]] = Field(None, description="List of eligible datacenters for execution")
+    volumes: Optional[List[str]] = Field(None, description="List of volumes to mount (format: 'host_path:container_path[:mode]')")
 
 
 class JobResponse(BaseModel):
@@ -38,6 +39,7 @@ class JobResponse(BaseModel):
     allocation_timeout: int
     eligible_regions: List[str]
     eligible_datacenters: List[str]
+    volumes: List[str]
     status: JobStatus
     status_date: str
     executor_ip: Optional[str]
@@ -144,6 +146,7 @@ def job_to_response(job: Job) -> JobResponse:
         allocation_timeout=job.allocation_timeout,
         eligible_regions=job.eligible_regions,
         eligible_datacenters=job.eligible_datacenters,
+        volumes=job.volumes,
         status=job.status,
         status_date=job.status_date.isoformat(),
         executor_ip=job.executor_ip,
@@ -170,7 +173,8 @@ async def create_job(
             gpu_count=gpu_count,
             allocation_timeout=job_request.allocation_timeout if job_request.allocation_timeout else 300,
             eligible_regions=job_request.eligible_regions if job_request.eligible_regions else [],
-            eligible_datacenters=job_request.eligible_datacenters if job_request.eligible_datacenters else []
+            eligible_datacenters=job_request.eligible_datacenters if job_request.eligible_datacenters else [],
+            volumes=job_request.volumes if job_request.volumes else []
         )
         
         success = job_manager.submit_job(job)
